@@ -1,6 +1,6 @@
 {
   "name": "@luswt/parse-session",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Export AI coding agent sessions to JSON — run in any project directory to auto-detect and export all sessions",
   "bin": {
     "parse-session": "./parse-session.mjs"
