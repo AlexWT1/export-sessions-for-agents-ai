@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import init from "sql.js";
 import fs from "fs";
 import path from "path";
@@ -120,6 +121,10 @@ function buildChangesFromEdits(parsedParts, workDir) {
     else if (writePaths.has(filePath) && !st.hasOld) type = "added";
     return { path: filePath, type, additions: st.additions, deletions: st.deletions };
   });
+}
+
+function normalizePath(p) {
+  return path.resolve(p).replace(/\\/g, "/").toLowerCase();
 }
 
 function buildChangesFromPatches(session, patches) {
@@ -356,11 +361,76 @@ async function listSessions(limit = 20) {
   }
 }
 
-const sessionId = process.argv[2];
+async function findSessionsByDirectory(cwd) {
+  const SQL = await init();
+  const buf = fs.readFileSync(DB_PATH);
+  const db = new SQL.Database(buf);
+  try {
+    const rows = parseRows(
+      db.exec(
+        `SELECT id, directory, title, time_created, parent_id FROM session WHERE parent_id IS NULL ORDER BY time_updated DESC`
+      )
+    );
+    const normCwd = normalizePath(cwd);
+    return rows.filter((r) => {
+      const normDir = normalizePath(r.directory);
+      return normDir === normCwd || normCwd.startsWith(normDir + "/");
+    });
+  } finally {
+    db.close();
+  }
+}
 
-if (!sessionId) {
+async function exportProjectSessions(agent) {
+  const cwd = process.cwd();
+  const sessions = await findSessionsByDirectory(cwd);
+
+  if (sessions.length === 0) {
+    console.log(`No sessions found for directory: ${cwd}`);
+    process.exit(0);
+  }
+
+  const exportDir = path.join(cwd, `export-${agent}`);
+  if (!fs.existsSync(exportDir)) fs.mkdirSync(exportDir, { recursive: true });
+
+  console.log(`Found ${sessions.length} session(s) for: ${cwd}\n`);
+
+  for (const s of sessions) {
+    try {
+      const info = await getSessionInfo(s.id);
+      const outPath = path.join(exportDir, `${s.id}.json`);
+      fs.writeFileSync(outPath, JSON.stringify(info, null, 2), "utf-8");
+      console.log(`  ${s.id}  ${s.title || "(untitled)"}  ->  export-${agent}/${s.id}.json`);
+    } catch (err) {
+      console.error(`  ${s.id}  ERROR: ${err.message}`);
+    }
+  }
+
+  console.log(`\nExported to: ${exportDir}`);
+}
+
+const SUPPORTED_AGENTS = ["opencode"];
+
+const args = process.argv.slice(2);
+let agent = null;
+let sessionId = null;
+let showList = false;
+
+for (const arg of args) {
+  if (arg === "--list" || arg === "-l") {
+    showList = true;
+  } else if (arg.startsWith("--")) {
+    const val = arg.startsWith("--agent=") ? arg.split("=")[1] : null;
+    if (val) agent = val;
+  } else if (arg.startsWith("ses_")) {
+    sessionId = arg;
+  } else if (SUPPORTED_AGENTS.includes(arg)) {
+    agent = arg;
+  }
+}
+
+if (showList) {
   const sessions = await listSessions();
-  console.log("Usage: node parse-session.mjs <session_id>\n");
   console.log("Recent sessions:");
   for (const s of sessions) {
     console.log(`  ${s.id}  ${s.title}  (${s.date})`);
@@ -368,9 +438,22 @@ if (!sessionId) {
   process.exit(0);
 }
 
-const info = await getSessionInfo(sessionId);
-const exportsDir = path.join(process.cwd(), "exports");
-if (!fs.existsSync(exportsDir)) fs.mkdirSync(exportsDir, { recursive: true });
-const outPath = path.join(exportsDir, `${sessionId}.json`);
-fs.writeFileSync(outPath, JSON.stringify(info, null, 2), "utf-8");
-console.log(`Saved: ${outPath}`);
+if (sessionId) {
+  const info = await getSessionInfo(sessionId);
+  const exportsDir = path.join(process.cwd(), "exports");
+  if (!fs.existsSync(exportsDir)) fs.mkdirSync(exportsDir, { recursive: true });
+  const outPath = path.join(exportsDir, `${sessionId}.json`);
+  fs.writeFileSync(outPath, JSON.stringify(info, null, 2), "utf-8");
+  console.log(`Saved: ${outPath}`);
+  process.exit(0);
+}
+
+const agents = agent ? [agent] : SUPPORTED_AGENTS;
+for (const a of agents) {
+  const cwdSessions = await findSessionsByDirectory(process.cwd());
+  if (cwdSessions.length === 0) {
+    console.log(`No ${a} sessions found for: ${process.cwd()}`);
+    continue;
+  }
+  await exportProjectSessions(a);
+}
