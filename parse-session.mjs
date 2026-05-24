@@ -23,20 +23,9 @@ function parseRows(result) {
   });
 }
 
-const MODEL_ALIASES = {
-  "accounts/fireworks/models/glm-5p1": "GLM 5.1",
-  "accounts/fireworks/models/minimax-m2p7": "MiniMax M2P7",
-  "accounts/fireworks/models/qwq-32b": "QwQ 32B",
-  "accounts/fireworks/models/llama4-maverick-17b": "Llama 4 Maverick 17B",
-  "accounts/fireworks/models/deepseek-r1": "DeepSeek R1",
-  "accounts/fireworks/models/deepseek-v3": "DeepSeek V3",
-  "accounts/fireworks/models/llama3p3-70b": "Llama 3.3 70B",
-  "accounts/fireworks/models/llama3p1-8b": "Llama 3.1 8B",
-};
-
 function getModelDisplayName(modelId) {
   if (!modelId) return null;
-  return MODEL_ALIASES[modelId] || modelId.split("/").pop();
+  return modelId.split("/").pop();
 }
 
 function formatDuration(ms) {
