@@ -55,6 +55,7 @@ parse-session --list
 | `parse-session --agent=<agent>` | Same as above |
 | `parse-session <session_id>` | Export a single session by ID |
 | `parse-session --list` / `-l` | List 20 most recent sessions |
+| `parse-session --db-path=<path>` | Override database path for the agent |
 
 ## Environment variables
 

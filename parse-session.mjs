@@ -419,9 +419,10 @@ let showList = false;
 for (const arg of args) {
   if (arg === "--list" || arg === "-l") {
     showList = true;
-  } else if (arg.startsWith("--")) {
-    const val = arg.startsWith("--agent=") ? arg.split("=")[1] : null;
-    if (val) agent = val;
+  } else if (arg.startsWith("--db-path=")) {
+    process.env.OPENCODE_DB_PATH = arg.split("=").slice(1).join("=");
+  } else if (arg.startsWith("--agent=")) {
+    agent = arg.split("=")[1];
   } else if (arg.startsWith("ses_")) {
     sessionId = arg;
   } else if (SUPPORTED_AGENTS.includes(arg)) {
